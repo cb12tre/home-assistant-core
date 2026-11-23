@@ -62,14 +62,18 @@ async def test_adguard_custom_setup_and_commands(
         await hass.async_block_till_done()
 
     entity_id = "switch.adguard_home_dhcp_server"
-    assert hass.states.is_state(entity_id, STATE_OFF)
+    assert hass.states.is_state(entity_id, STATE_OFF), [
+        (state.entity_id, state.state) for state in hass.states.async_all("switch")
+    ]
     await hass.services.async_call(
         "switch", "turn_on", {ATTR_ENTITY_ID: entity_id}, blocking=True
     )
+    await hass.async_block_till_done()
     assert hass.states.is_state(entity_id, STATE_ON)
     await hass.services.async_call(
         "switch", "turn_off", {ATTR_ENTITY_ID: entity_id}, blocking=True
     )
+    await hass.async_block_till_done()
     assert hass.states.is_state(entity_id, STATE_OFF)
 
     mock_adguard.dhcp.enable.side_effect = AdGuardHomeError("simulated failure")
@@ -119,10 +123,12 @@ async def test_huawei_custom_setup_and_commands(hass: HomeAssistant) -> None:
     await hass.services.async_call(
         "switch", "turn_on", {ATTR_ENTITY_ID: entity_id}, blocking=True
     )
+    await hass.async_block_till_done()
     assert hass.states.is_state(entity_id, STATE_ON)
     await hass.services.async_call(
         "switch", "turn_off", {ATTR_ENTITY_ID: entity_id}, blocking=True
     )
+    await hass.async_block_till_done()
     assert hass.states.is_state(entity_id, STATE_OFF)
     assert settings == original
 
