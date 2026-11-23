@@ -93,7 +93,7 @@ jobs:
         working-directory: source
         run: |
           set -o pipefail
-          .venv/bin/python -m pytest -q --timeout=30 tests/components/dhcp_custom_package/test_custom_loader.py 2>&1 | tee /tmp/custom-test.log || {
+          .venv/bin/python -m pytest -q --timeout=30 tests/components/dhcp_custom_package 2>&1 | tee /tmp/custom-test.log || {
             message=$(tail -30 /tmp/custom-test.log | tr '\n' ' ' | sed 's/%/%25/g')
             echo "::error::Custom loader test failed: $message"
             exit 1
