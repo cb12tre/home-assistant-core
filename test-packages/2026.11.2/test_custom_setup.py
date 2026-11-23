@@ -1,13 +1,15 @@
 """Exercise experimental custom integrations with simulated devices."""
 
 from dataclasses import replace
+from datetime import timedelta
 from pathlib import Path
 import shutil
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from adguardhome import AdGuardHomeError, DhcpConfig
+from freezegun.api import FrozenDateTimeFactory
 import pytest
-from pytest_homeassistant.common import MockConfigEntry
+from pytest_homeassistant.common import MockConfigEntry, async_fire_time_changed
 
 from homeassistant import loader
 from homeassistant.const import ATTR_ENTITY_ID, CONF_URL, STATE_OFF, STATE_ON
@@ -36,6 +38,7 @@ async def test_adguard_custom_setup_and_commands(
     hass: HomeAssistant,
     mock_adguard: AsyncMock,
     mock_config_entry: MockConfigEntry,
+    freezer: FrozenDateTimeFactory,
 ) -> None:
     """Set up the custom AdGuard entry and control simulated DHCP."""
     await install_custom(hass, "adguard")
@@ -73,7 +76,9 @@ async def test_adguard_custom_setup_and_commands(
     await hass.services.async_call(
         "switch", "turn_off", {ATTR_ENTITY_ID: entity_id}, blocking=True
     )
-    await hass.async_block_till_done()
+    freezer.tick(timedelta(seconds=30))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done(wait_background_tasks=True)
     assert hass.states.is_state(entity_id, STATE_OFF)
 
     mock_adguard.dhcp.enable.side_effect = AdGuardHomeError("simulated failure")
