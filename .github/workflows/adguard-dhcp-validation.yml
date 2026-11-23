@@ -41,6 +41,7 @@ jobs:
         working-directory: source
         run: |
           set -o pipefail
+          echo "Testing ${{ matrix.branch }} with ${{ matrix.tests }}"
           .venv/bin/python -m pytest -q --timeout=30 "${{ matrix.tests }}" 2>&1 | tee /tmp/dhcp-test.log || {
             message=$(tail -30 /tmp/dhcp-test.log | tr '\n' ' ' | sed 's/%/%25/g')
             echo "::error::Pytest failed: $message"
