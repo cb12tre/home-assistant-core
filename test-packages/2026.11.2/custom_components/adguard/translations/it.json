@@ -1,25 +1,193 @@
 {
   "entity": {
     "sensor": {
-      "average_processing_speed": {"name": "Velocità di elaborazione media"},
-      "dns_queries": {"name": "Query DNS"},
-      "dns_queries_blocked": {"name": "Query DNS bloccate"},
-      "dns_queries_blocked_ratio": {"name": "Rapporto di query DNS bloccate"},
-      "parental_control_blocked": {"name": "Controllo genitori bloccato"},
-      "rules_count": {"name": "Conteggio delle regole"},
-      "safe_browsing_blocked": {"name": "Navigazione sicura bloccata"},
-      "safe_searches_enforced": {"name": "Ricerche sicure applicate"}
+      "average_processing_speed": {
+        "name": "Velocità di elaborazione media"
+      },
+      "dns_queries": {
+        "name": "Query DNS"
+      },
+      "dns_queries_blocked": {
+        "name": "Query DNS bloccate"
+      },
+      "dns_queries_blocked_ratio": {
+        "name": "Rapporto di query DNS bloccate"
+      },
+      "parental_control_blocked": {
+        "name": "Controllo genitori bloccato"
+      },
+      "rules_count": {
+        "name": "Conteggio delle regole"
+      },
+      "safe_browsing_blocked": {
+        "name": "Navigazione sicura bloccata"
+      },
+      "safe_searches_enforced": {
+        "name": "Ricerche sicure applicate"
+      }
     },
     "switch": {
-      "filtering": {"name": "Filtrando"},
-      "parental": {"name": "Controllo dei genitori"},
-      "protection": {"name": "Protezione"},
-      "query_log": {"name": "Registro delle interrogazioni"},
-      "safe_browsing": {"name": "Navigazione sicura"},
-      "safe_search": {"name": "Ricerca sicura"},
+      "filtering": {
+        "name": "Filtrando"
+      },
+      "parental": {
+        "name": "Controllo dei genitori"
+      },
+      "protection": {
+        "name": "Protezione"
+      },
+      "query_log": {
+        "name": "Registro delle interrogazioni"
+      },
+      "safe_browsing": {
+        "name": "Navigazione sicura"
+      },
+      "safe_search": {
+        "name": "Ricerca sicura"
+      },
       "dhcp": {
         "name": "Server DHCP"
       }
     }
-  }
+  },
+  "config": {
+    "abort": {
+      "already_configured": "Il servizio è già configurato",
+      "existing_instance_updated": "Configurazione esistente aggiornata."
+    },
+    "error": {
+      "cannot_connect": "Impossibile connettersi",
+      "invalid_auth": "Invalid authentication",
+      "unknown": "Unexpected error"
+    },
+    "step": {
+      "hassio_confirm": {
+        "description": "Do you want to configure Home Assistant to connect to the AdGuard Home provided by the app: {addon}?",
+        "title": "AdGuard Home via Home Assistant app"
+      },
+      "reauth_confirm": {
+        "data": {
+          "password": "Password",
+          "username": "Username"
+        },
+        "data_description": {
+          "password": "The password to log in to AdGuard Home with.",
+          "username": "The username to log in to AdGuard Home with."
+        },
+        "description": "AdGuard Home rejected the credentials. Enter the username and password to log in with.",
+        "title": "Authentication expired for {name}"
+      },
+      "reconfigure": {
+        "data": {
+          "host": "Host",
+          "password": "Password",
+          "port": "Port",
+          "ssl": "Uses an SSL certificate",
+          "username": "Username",
+          "verify_ssl": "Verify SSL certificate"
+        },
+        "data_description": {
+          "host": "The hostname or IP address of the device running your AdGuard Home."
+        },
+        "description": "Update the connection settings of your AdGuard Home instance."
+      },
+      "user": {
+        "data": {
+          "host": "Host",
+          "password": "Password",
+          "port": "Porta",
+          "ssl": "Utilizza un certificato SSL",
+          "username": "Nome utente",
+          "verify_ssl": "Verifica il certificato SSL"
+        },
+        "data_description": {
+          "host": "Il nome host o l'indirizzo IP del dispositivo AdGuard Home."
+        },
+        "description": "Configura l'istanza di AdGuard Home per consentire il monitoraggio e il controllo."
+      }
+    }
+  },
+  "exceptions": {
+    "action_failed": {
+      "message": "AdGuard Home could not complete the action: {error}"
+    },
+    "authentication_failed": {
+      "message": "AdGuard Home rejected the credentials. Please reauthenticate with a valid username and password."
+    },
+    "cannot_connect": {
+      "message": "Could not connect to AdGuard Home."
+    },
+    "config_entry_not_loaded": {
+      "message": "Config entry not loaded."
+    },
+    "error_while_turn_off": {
+      "message": "An error occurred while turning off AdGuard Home switch."
+    },
+    "error_while_turn_on": {
+      "message": "An error occurred while turning on AdGuard Home switch."
+    },
+    "install_update_failed": {
+      "message": "Failed to install the AdGuard Home update"
+    },
+    "update_failed": {
+      "message": "An error occurred while updating AdGuard Home: {error}"
+    }
+  },
+  "services": {
+    "add_url": {
+      "description": "Aggiungi un nuovo abbonamento filtro ad AdGuard Home.",
+      "fields": {
+        "name": {
+          "description": "Il nome dell'abbonamento al filtro.",
+          "name": "Nome"
+        },
+        "url": {
+          "description": "L'URL del filtro a cui iscriversi, contenente le regole del filtro.",
+          "name": "URL"
+        }
+      },
+      "name": "Aggiungi URL"
+    },
+    "disable_url": {
+      "description": "Disabilita un abbonamento al filtro in AdGuard Home.",
+      "fields": {
+        "url": {
+          "description": "URL di abbonamento al filtro da disattivare.",
+          "name": "URL"
+        }
+      },
+      "name": "Disattiva l'URL"
+    },
+    "enable_url": {
+      "description": "Abilita un abbonamento al filtro in AdGuard Home.",
+      "fields": {
+        "url": {
+          "description": "URL di abbonamento al filtro da abilitare.",
+          "name": "URL"
+        }
+      },
+      "name": "Abilita URL"
+    },
+    "refresh": {
+      "description": "Esegue l'aggiornamento di tutti gli abbonamenti ai filtri in AdGuard Home.",
+      "fields": {
+        "force": {
+          "description": "Aggiornamento forzato (ignora la limitazione di AdGuard Home), omettere per un aggiornamento normale.",
+          "name": "Forza"
+        }
+      },
+      "name": "Aggiorna"
+    },
+    "remove_url": {
+      "description": "Rimuove l'abbonamento a un filtro da AdGuard Home.",
+      "fields": {
+        "url": {
+          "description": "L'URL della sottoscrizione del filtro da rimuovere.",
+          "name": "URL"
+        }
+      },
+      "name": "Rimuovi URL"
+    }
+  },
+  "title": "AdGuard Home"
 }

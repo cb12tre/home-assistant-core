@@ -35,3 +35,9 @@ async def test_custom_integration_loads(hass: HomeAssistant, domain: str) -> Non
         )
     )
     assert translations["entity"]["switch"]["dhcp"]["name"] == "DHCP server"
+    italian = json.loads(
+        await hass.async_add_executor_job(
+            (destination / "translations" / "it.json").read_text, "utf-8"
+        )
+    )
+    assert italian["entity"]["switch"]["dhcp"]["name"] == "Server DHCP"

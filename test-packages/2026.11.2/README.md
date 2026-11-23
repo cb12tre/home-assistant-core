@@ -13,5 +13,5 @@ The copies are based on Home Assistant Core 2026.11.2. The developer changes
 for contribution to Core are in the separate `adguard-dhcp-status` and
 `huawei-dhcp-switch` branches.
 
-Both copies are incomplete translations. English is the fallback and the
-Italian translations currently cover only a subset of the existing entities.
+The Italian translations mirror the existing Home Assistant installation and
+add a name for the DHCP switch. English remains the fallback for missing keys.
