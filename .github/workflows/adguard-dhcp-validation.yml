@@ -68,6 +68,7 @@ jobs:
           }
 
   custom-load:
+    name: Load custom components and translations
     runs-on: ubuntu-latest
     timeout-minutes: 35
     steps:
