@@ -20,7 +20,7 @@ jobs:
           - branch: adguard-dhcp-status
             tests: tests/components/adguard
           - branch: huawei-dhcp-switch
-            tests: tests/components/huawei_lte/test_dhcp_switch.py
+            tests: tests/components/huawei_lte
     steps:
       - name: Fetch proposed branch
         run: |
