@@ -1,0 +1,25 @@
+{
+  "entity": {
+    "sensor": {
+      "average_processing_speed": {"name": "Velocità di elaborazione media"},
+      "dns_queries": {"name": "Query DNS"},
+      "dns_queries_blocked": {"name": "Query DNS bloccate"},
+      "dns_queries_blocked_ratio": {"name": "Rapporto di query DNS bloccate"},
+      "parental_control_blocked": {"name": "Controllo genitori bloccato"},
+      "rules_count": {"name": "Conteggio delle regole"},
+      "safe_browsing_blocked": {"name": "Navigazione sicura bloccata"},
+      "safe_searches_enforced": {"name": "Ricerche sicure applicate"}
+    },
+    "switch": {
+      "filtering": {"name": "Filtrando"},
+      "parental": {"name": "Controllo dei genitori"},
+      "protection": {"name": "Protezione"},
+      "query_log": {"name": "Registro delle interrogazioni"},
+      "safe_browsing": {"name": "Navigazione sicura"},
+      "safe_search": {"name": "Ricerca sicura"},
+      "dhcp": {
+        "name": "Server DHCP"
+      }
+    }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "domain": "huawei_lte",
+  "name": "Huawei LTE",
+  "categories": ["computers_network.routers_network"],
+  "codeowners": [],
+  "config_flow": true,
+  "connectivity": ["network"],
+  "documentation": "https://github.com/cb12tre/home-assistant-core/tree/huawei-dhcp-switch/homeassistant/components/huawei_lte",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "loggers": ["huawei_lte_api.Session"],
+  "requirements": ["huawei-lte-api>=1.11.0", "url-normalize>=3.0.1"],
+  "ssdp": [
+    {
+      "deviceType": "urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+      "manufacturer": "Huawei"
+    },
+    {
+      "deviceType": "urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+      "manufacturer": "Huawei Technologies Co., Ltd."
+    },
+    {
+      "deviceType": "urn:schemas-upnp-org:device:InternetGatewayDevice:1",
+      "manufacturer": "SOYEA TECHNOLOGY CO., LTD."
+    }
+  ],
+  "version": "2026.11.2-dhcp-test"
+}

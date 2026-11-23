@@ -1,0 +1,15 @@
+{
+  "entity": {
+    "switch": {
+      "dhcp": {
+        "name": "Server DHCP"
+      },
+      "mobile_data": {
+        "name": "Dati mobili"
+      },
+      "wifi_guest_network": {
+        "name": "Rete ospite Wi-Fi"
+      }
+    }
+  }
+}

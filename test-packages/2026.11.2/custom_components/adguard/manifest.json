@@ -1,0 +1,14 @@
+{
+  "domain": "adguard",
+  "name": "AdGuard Home",
+  "categories": ["computers_network.routers_network"],
+  "codeowners": [],
+  "config_flow": true,
+  "connectivity": ["network"],
+  "documentation": "https://github.com/cb12tre/home-assistant-core/tree/adguard-dhcp-status/homeassistant/components/adguard",
+  "integration_type": "service",
+  "iot_class": "local_polling",
+  "loggers": ["adguardhome"],
+  "requirements": ["adguardhome>=1.0.0"],
+  "version": "2026.11.2-dhcp-test"
+}
