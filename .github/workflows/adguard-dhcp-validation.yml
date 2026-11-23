@@ -24,7 +24,7 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           uv python install 3.14.10
           uv venv
-          uv pip install -e . -e packages/pytest-homeassistant -r requirements_test.txt adguardhome==1.0.0
+          uv pip install -e . -e packages/pytest-homeassistant -r requirements_test.txt adguardhome==1.0.0 aiohasupervisor==0.11.0
       - name: Generate English translations
         working-directory: source
         run: .venv/bin/python -m script.translations develop --integration adguard
