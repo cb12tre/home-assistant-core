@@ -138,9 +138,18 @@ async def test_dhcp_unavailable_and_recovery(
     assert protection_state is not None
     assert protection_state.state == STATE_ON
 
+    mock_adguard.status.return_value = replace(
+        mock_adguard.status.return_value, protection_enabled=False
+    )
+    freezer.tick(timedelta(seconds=10))
+    async_fire_time_changed(hass)
+    await hass.async_block_till_done(wait_background_tasks=True)
+    assert hass.states.is_state("switch.adguard_home_protection", STATE_OFF)
+    assert hass.states.is_state(ENTITY_ID, STATE_UNAVAILABLE)
+
     mock_adguard.dhcp.config.side_effect = None
     mock_adguard.dhcp.config.return_value = DhcpConfig(enabled=True)
-    freezer.tick(timedelta(seconds=30))
+    freezer.tick(timedelta(seconds=10))
     async_fire_time_changed(hass)
     await hass.async_block_till_done(wait_background_tasks=True)
     dhcp_state = hass.states.get(ENTITY_ID)
