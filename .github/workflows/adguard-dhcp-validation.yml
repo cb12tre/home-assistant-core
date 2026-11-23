@@ -89,7 +89,7 @@ jobs:
       - name: Generate English translations
         working-directory: source
         run: .venv/bin/python -m script.translations develop --all
-      - name: Test custom integration loader
+      - name: Test custom integration setup and control
         working-directory: source
         run: |
           set -o pipefail
