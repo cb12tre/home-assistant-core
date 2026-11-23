@@ -66,3 +66,34 @@ jobs:
             echo "::error::Pytest failed: $message"
             exit 1
           }
+
+  custom-load:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Fetch release and experimental packages
+        run: |
+          git clone --depth 1 --branch 2026.11.2 https://github.com/home-assistant/core.git source
+          git clone --depth 1 --branch test/custom-dhcp-2026.11.2 https://github.com/cb12tre/home-assistant-core.git packages
+          cp -r packages/test-packages/2026.11.2 source/tests/components/dhcp_custom_package
+          git -C packages rev-parse HEAD
+      - name: Install test dependencies
+        working-directory: source
+        run: |
+          python3 -m pip install --user uv
+          export PATH="$HOME/.local/bin:$PATH"
+          uv python install 3.14.10
+          uv venv
+          uv pip install -e . -e packages/pytest-homeassistant -r requirements_test.txt adguardhome==1.0.0 aiohasupervisor==0.11.0 huawei-lte-api==1.11.0 url-normalize==3.0.1
+      - name: Generate English translations
+        working-directory: source
+        run: .venv/bin/python -m script.translations develop --all
+      - name: Test custom integration loader
+        working-directory: source
+        run: |
+          set -o pipefail
+          .venv/bin/python -m pytest -q --timeout=30 tests/components/dhcp_custom_package/test_custom_loader.py 2>&1 | tee /tmp/custom-test.log || {
+            message=$(tail -30 /tmp/custom-test.log | tr '\n' ' ' | sed 's/%/%25/g')
+            echo "::error::Custom loader test failed: $message"
+            exit 1
+          }
