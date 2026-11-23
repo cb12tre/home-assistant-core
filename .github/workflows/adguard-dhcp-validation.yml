@@ -28,7 +28,11 @@ jobs:
           - branch: 2026.11.2
             tests: tests/components/huawei_lte
             repository: home-assistant/core
-            release_patch: true
+            release_patch: huawei-dhcp-2026.11.2.patch
+          - branch: 2026.11.2
+            tests: tests/components/adguard
+            repository: home-assistant/core
+            release_patch: adguard-dhcp-2026.11.2.patch
     steps:
       - name: Fetch proposed branch
         run: |
@@ -38,9 +42,9 @@ jobs:
         if: matrix.release_patch
         working-directory: source
         run: |
-          curl -fsSL "https://raw.githubusercontent.com/cb12tre/home-assistant-core/${{ github.sha }}/.github/huawei-dhcp-2026.11.2.patch" -o /tmp/huawei.patch
-          git apply --check /tmp/huawei.patch
-          git apply /tmp/huawei.patch
+          curl -fsSL "https://raw.githubusercontent.com/cb12tre/home-assistant-core/${{ github.sha }}/.github/${{ matrix.release_patch }}" -o /tmp/release.patch
+          git apply --check /tmp/release.patch
+          git apply /tmp/release.patch
       - name: Install test dependencies
         working-directory: source
         run: |

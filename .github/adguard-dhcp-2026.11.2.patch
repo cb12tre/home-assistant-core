@@ -1,0 +1,305 @@
+diff --git a/homeassistant/components/adguard/coordinator.py b/homeassistant/components/adguard/coordinator.py
+index fa9daf6..4304853 100644
+--- a/homeassistant/components/adguard/coordinator.py
++++ b/homeassistant/components/adguard/coordinator.py
+@@ -12,6 +12,7 @@ from adguardhome import (
+     AdGuardHomeConnectionError,
+     AdGuardHomeError,
+     AvailableUpdate,
++    DhcpConfig,
+     FilteringConfig,
+     FilterList,
+     QueryLogConfig,
+@@ -161,6 +162,21 @@ class AdGuardHomeStatisticsCoordinator(AdGuardHomeCoordinator[AdGuardHomeStatist
+         return AdGuardHomeStatistics(stats=stats, blocklists=blocklists)
+ 
+ 
++class AdGuardHomeDhcpCoordinator(AdGuardHomeCoordinator[DhcpConfig]):
++    """Keep track of the DHCP server configuration independently."""
++
++    def __init__(
++        self, hass: HomeAssistant, entry: AdGuardConfigEntry, client: AdGuardHome
++    ) -> None:
++        """Initialize the coordinator."""
++        super().__init__(hass, entry, client, "dhcp", timedelta(seconds=30))
++
++    @override
++    async def _async_fetch(self) -> DhcpConfig:
++        """Fetch the DHCP server configuration."""
++        return await self.client.dhcp.config()
++
++
+ class AdGuardHomeUpdateCoordinator(AdGuardHomeCoordinator[AvailableUpdate]):
+     """Keep track of updates for AdGuard Home."""
+ 
+diff --git a/homeassistant/components/adguard/strings.json b/homeassistant/components/adguard/strings.json
+index a992705..ba1af0e 100644
+--- a/homeassistant/components/adguard/strings.json
++++ b/homeassistant/components/adguard/strings.json
+@@ -84,6 +84,9 @@
+       }
+     },
+     "switch": {
++      "dhcp": {
++        "name": "DHCP server"
++      },
+       "filtering": {
+         "name": "Filtering"
+       },
+diff --git a/homeassistant/components/adguard/switch.py b/homeassistant/components/adguard/switch.py
+index 0fcb6a6..4297032 100644
+--- a/homeassistant/components/adguard/switch.py
++++ b/homeassistant/components/adguard/switch.py
+@@ -14,6 +14,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+ from .const import DOMAIN
+ from .coordinator import (
+     AdGuardConfigEntry,
++    AdGuardHomeDhcpCoordinator,
+     AdGuardHomeState,
+     AdGuardHomeStateCoordinator,
+ )
+@@ -89,6 +90,53 @@ async def async_setup_entry(
+         AdGuardHomeSwitch(coordinator, description) for description in SWITCHES
+     )
+ 
++    if coordinator.data.status.dhcp_available:
++        dhcp = AdGuardHomeDhcpCoordinator(hass, entry, entry.runtime_data.client)
++        await dhcp.async_refresh()
++        async_add_entities([AdGuardDhcpSwitch(dhcp)])
++
++
++class AdGuardDhcpSwitch(AdGuardHomeEntity[AdGuardHomeDhcpCoordinator], SwitchEntity):
++    """Control the AdGuard Home DHCP server."""
++
++    _attr_translation_key = "dhcp"
++    _attr_icon = "mdi:ip-network"
++
++    def __init__(self, coordinator: AdGuardHomeDhcpCoordinator) -> None:
++        """Initialize the DHCP switch."""
++        super().__init__(coordinator)
++        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_dhcp"
++
++    @property
++    @override
++    def is_on(self) -> bool | None:
++        """Return whether DHCP is configured as enabled."""
++        return self.coordinator.data.enabled if self.coordinator.data else None
++
++    @override
++    async def async_turn_on(self, **kwargs: Any) -> None:
++        """Enable the DHCP server."""
++        try:
++            await self.coordinator.client.dhcp.enable()
++        except AdGuardHomeError as err:
++            raise HomeAssistantError(
++                translation_domain=DOMAIN,
++                translation_key="error_while_turn_on",
++            ) from err
++        await self.coordinator.async_request_refresh()
++
++    @override
++    async def async_turn_off(self, **kwargs: Any) -> None:
++        """Disable the DHCP server."""
++        try:
++            await self.coordinator.client.dhcp.disable()
++        except AdGuardHomeError as err:
++            raise HomeAssistantError(
++                translation_domain=DOMAIN,
++                translation_key="error_while_turn_off",
++            ) from err
++        await self.coordinator.async_request_refresh()
++
+ 
+ class AdGuardHomeSwitch(AdGuardHomeEntity[AdGuardHomeStateCoordinator], SwitchEntity):
+     """Defines a AdGuard Home switch."""
+diff --git a/tests/components/adguard/conftest.py b/tests/components/adguard/conftest.py
+index 34079a2..2ba3bad 100644
+--- a/tests/components/adguard/conftest.py
++++ b/tests/components/adguard/conftest.py
+@@ -15,6 +15,7 @@ from adguardhome import (
+     Status,
+     TimeUnit,
+ )
++from adguardhome.dhcp import AdGuardHomeDhcp
+ from adguardhome.filtering import AdGuardHomeFiltering, FilterLists
+ from adguardhome.querylog import AdGuardHomeQueryLog
+ from adguardhome.safesearch import AdGuardHomeSafeSearch
+@@ -61,6 +62,7 @@ def mock_config_entry() -> MockConfigEntry:
+ def mock_adguard() -> Generator[AsyncMock]:
+     """Return a mocked AdGuard Home client."""
+     adguard_mock = AsyncMock(spec=AdGuardHome)
++    adguard_mock.dhcp = AsyncMock(spec=AdGuardHomeDhcp)
+     adguard_mock.filtering = AsyncMock(spec=AdGuardHomeFiltering)
+     adguard_mock.filtering.blocklists = AsyncMock(spec=FilterLists)
+     adguard_mock.parental = AsyncMock(spec=Toggle)
+diff --git a/tests/components/adguard/test_dhcp_switch.py b/tests/components/adguard/test_dhcp_switch.py
+new file mode 100644
+index 0000000..2687b70
+--- /dev/null
++++ b/tests/components/adguard/test_dhcp_switch.py
+@@ -0,0 +1,165 @@
++"""Tests for the AdGuard Home DHCP switch."""
++
++from dataclasses import replace
++from datetime import timedelta
++from unittest.mock import AsyncMock
++
++from adguardhome import AdGuardHomeConnectionError, AdGuardHomeError, DhcpConfig
++from freezegun.api import FrozenDateTimeFactory
++import pytest
++from pytest_homeassistant.common import MockConfigEntry, async_fire_time_changed
++
++from homeassistant.config_entries import ConfigEntryState
++from homeassistant.const import (
++    ATTR_ENTITY_ID,
++    STATE_OFF,
++    STATE_ON,
++    STATE_UNAVAILABLE,
++    Platform,
++)
++from homeassistant.core import HomeAssistant
++from homeassistant.exceptions import HomeAssistantError
++
++ENTITY_ID = "switch.adguard_home_dhcp_server"
++
++
++@pytest.fixture
++def platforms() -> list[Platform]:
++    """Set up only the switch platform."""
++    return [Platform.SWITCH]
++
++
++@pytest.mark.parametrize(
++    ("enabled", "expected"), [(True, STATE_ON), (False, STATE_OFF)]
++)
++async def test_dhcp_state(
++    hass: HomeAssistant,
++    mock_adguard: AsyncMock,
++    mock_config_entry: MockConfigEntry,
++    enabled: bool,
++    expected: str,
++) -> None:
++    """Expose the configured DHCP state."""
++    mock_adguard.status.return_value = replace(
++        mock_adguard.status.return_value, dhcp_available=True
++    )
++    mock_adguard.dhcp.config.return_value = DhcpConfig(enabled=enabled)
++    mock_config_entry.add_to_hass(hass)
++    await hass.config_entries.async_setup(mock_config_entry.entry_id)
++    await hass.async_block_till_done()
++
++    state = hass.states.get(ENTITY_ID)
++    assert state is not None
++    assert state.state == expected
++
++
++@pytest.mark.parametrize(
++    ("service", "method", "enabled", "expected"),
++    [("turn_on", "enable", True, STATE_ON), ("turn_off", "disable", False, STATE_OFF)],
++)
++async def test_dhcp_control(
++    hass: HomeAssistant,
++    mock_adguard: AsyncMock,
++    mock_config_entry: MockConfigEntry,
++    service: str,
++    method: str,
++    enabled: bool,
++    expected: str,
++) -> None:
++    """Call the DHCP action and refresh its observed state."""
++    mock_adguard.status.return_value = replace(
++        mock_adguard.status.return_value, dhcp_available=True
++    )
++    mock_adguard.dhcp.config.return_value = DhcpConfig(enabled=not enabled)
++    mock_config_entry.add_to_hass(hass)
++    await hass.config_entries.async_setup(mock_config_entry.entry_id)
++    await hass.async_block_till_done()
++    mock_adguard.dhcp.config.return_value = DhcpConfig(enabled=enabled)
++
++    await hass.services.async_call(
++        "switch", service, {ATTR_ENTITY_ID: ENTITY_ID}, blocking=True
++    )
++
++    getattr(mock_adguard.dhcp, method).assert_awaited_once()
++    state = hass.states.get(ENTITY_ID)
++    assert state is not None
++    assert state.state == expected
++
++
++@pytest.mark.parametrize(
++    ("service", "method"), [("turn_on", "enable"), ("turn_off", "disable")]
++)
++async def test_dhcp_control_error(
++    hass: HomeAssistant,
++    mock_adguard: AsyncMock,
++    mock_config_entry: MockConfigEntry,
++    service: str,
++    method: str,
++) -> None:
++    """Report failed DHCP actions without assuming a state change."""
++    mock_adguard.status.return_value = replace(
++        mock_adguard.status.return_value, dhcp_available=True
++    )
++    mock_adguard.dhcp.config.return_value = DhcpConfig(enabled=False)
++    getattr(mock_adguard.dhcp, method).side_effect = AdGuardHomeError("error")
++    mock_config_entry.add_to_hass(hass)
++    await hass.config_entries.async_setup(mock_config_entry.entry_id)
++    await hass.async_block_till_done()
++
++    with pytest.raises(HomeAssistantError):
++        await hass.services.async_call(
++            "switch", service, {ATTR_ENTITY_ID: ENTITY_ID}, blocking=True
++        )
++    state = hass.states.get(ENTITY_ID)
++    assert state is not None
++    assert state.state == STATE_OFF
++
++
++async def test_dhcp_unavailable_and_recovery(
++    hass: HomeAssistant,
++    mock_adguard: AsyncMock,
++    mock_config_entry: MockConfigEntry,
++    freezer: FrozenDateTimeFactory,
++) -> None:
++    """Keep other controls available and recover DHCP after a read error."""
++    mock_adguard.status.return_value = replace(
++        mock_adguard.status.return_value, dhcp_available=True
++    )
++    mock_adguard.dhcp.config.side_effect = AdGuardHomeConnectionError("offline")
++    mock_config_entry.add_to_hass(hass)
++    await hass.config_entries.async_setup(mock_config_entry.entry_id)
++    await hass.async_block_till_done()
++
++    assert mock_config_entry.state is ConfigEntryState.LOADED
++    dhcp_state = hass.states.get(ENTITY_ID)
++    assert dhcp_state is not None
++    assert dhcp_state.state == STATE_UNAVAILABLE
++    protection_state = hass.states.get("switch.adguard_home_protection")
++    assert protection_state is not None
++    assert protection_state.state == STATE_ON
++
++    mock_adguard.dhcp.config.side_effect = None
++    mock_adguard.dhcp.config.return_value = DhcpConfig(enabled=True)
++    freezer.tick(timedelta(seconds=30))
++    async_fire_time_changed(hass)
++    await hass.async_block_till_done(wait_background_tasks=True)
++    dhcp_state = hass.states.get(ENTITY_ID)
++    assert dhcp_state is not None
++    assert dhcp_state.state == STATE_ON
++
++
++async def test_dhcp_unsupported(
++    hass: HomeAssistant,
++    mock_adguard: AsyncMock,
++    mock_config_entry: MockConfigEntry,
++) -> None:
++    """Do not query DHCP on platforms without support."""
++    mock_adguard.status.return_value = replace(
++        mock_adguard.status.return_value, dhcp_available=False
++    )
++    mock_config_entry.add_to_hass(hass)
++    await hass.config_entries.async_setup(mock_config_entry.entry_id)
++    await hass.async_block_till_done()
++
++    assert hass.states.get(ENTITY_ID) is None
++    mock_adguard.dhcp.config.assert_not_called()
