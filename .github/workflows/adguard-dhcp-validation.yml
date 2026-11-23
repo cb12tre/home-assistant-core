@@ -19,13 +19,28 @@ jobs:
         include:
           - branch: adguard-dhcp-status
             tests: tests/components/adguard
+            repository: cb12tre/home-assistant-core
+            release_patch: false
           - branch: huawei-dhcp-switch
             tests: tests/components/huawei_lte
+            repository: cb12tre/home-assistant-core
+            release_patch: false
+          - branch: 2026.11.2
+            tests: tests/components/huawei_lte
+            repository: home-assistant/core
+            release_patch: true
     steps:
       - name: Fetch proposed branch
         run: |
-          git clone --depth 1 --branch "${{ matrix.branch }}" https://github.com/cb12tre/home-assistant-core.git source
+          git clone --depth 1 --branch "${{ matrix.branch }}" "https://github.com/${{ matrix.repository }}.git" source
           git -C source rev-parse HEAD
+      - name: Apply 2026.11.2 test patch
+        if: matrix.release_patch
+        working-directory: source
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/cb12tre/home-assistant-core/${{ github.sha }}/.github/huawei-dhcp-2026.11.2.patch" -o /tmp/huawei.patch
+          git apply --check /tmp/huawei.patch
+          git apply /tmp/huawei.patch
       - name: Install test dependencies
         working-directory: source
         run: |

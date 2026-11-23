@@ -1,0 +1,299 @@
+diff --git a/homeassistant/components/huawei_lte/__init__.py b/homeassistant/components/huawei_lte/__init__.py
+index afd79ab..a5a25c3 100644
+--- a/homeassistant/components/huawei_lte/__init__.py
++++ b/homeassistant/components/huawei_lte/__init__.py
+@@ -63,6 +63,7 @@ from .const import (
+     KEY_DEVICE_BASIC_INFORMATION,
+     KEY_DEVICE_INFORMATION,
+     KEY_DEVICE_SIGNAL,
++    KEY_DHCP_SETTINGS,
+     KEY_DIALUP_MOBILE_DATASWITCH,
+     KEY_LAN_HOST_INFO,
+     KEY_MONITORING_CHECK_NOTIFICATIONS,
+@@ -210,6 +211,7 @@ class Router:
+             KEY_DEVICE_BASIC_INFORMATION, self.client.device.basic_information
+         )
+         self._get_data(KEY_DEVICE_SIGNAL, self.client.device.signal)
++        self._get_data(KEY_DHCP_SETTINGS, self.client.dhcp.settings)
+         self._get_data(
+             KEY_DIALUP_MOBILE_DATASWITCH, self.client.dial_up.mobile_dataswitch
+         )
+diff --git a/homeassistant/components/huawei_lte/const.py b/homeassistant/components/huawei_lte/const.py
+index 09b61db..081aa54 100644
+--- a/homeassistant/components/huawei_lte/const.py
++++ b/homeassistant/components/huawei_lte/const.py
+@@ -33,6 +33,7 @@ ADMIN_SERVICES = {
+ KEY_DEVICE_BASIC_INFORMATION = "device_basic_information"
+ KEY_DEVICE_INFORMATION = "device_information"
+ KEY_DEVICE_SIGNAL = "device_signal"
++KEY_DHCP_SETTINGS = "dhcp_settings"
+ KEY_DIALUP_MOBILE_DATASWITCH = "dialup_mobile_dataswitch"
+ KEY_LAN_HOST_INFO = "lan_host_info"
+ KEY_MONITORING_CHECK_NOTIFICATIONS = "monitoring_check_notifications"
+@@ -69,7 +70,11 @@ SENSOR_KEYS = {
+     KEY_SMS_SMS_COUNT,
+ }
+ 
+-SWITCH_KEYS = {KEY_DIALUP_MOBILE_DATASWITCH, KEY_WLAN_WIFI_GUEST_NETWORK_SWITCH}
++SWITCH_KEYS = {
++    KEY_DHCP_SETTINGS,
++    KEY_DIALUP_MOBILE_DATASWITCH,
++    KEY_WLAN_WIFI_GUEST_NETWORK_SWITCH,
++}
+ 
+ ALL_KEYS = (
+     BINARY_SENSOR_KEYS
+diff --git a/homeassistant/components/huawei_lte/diagnostics.py b/homeassistant/components/huawei_lte/diagnostics.py
+index 865b4c1..4e34113 100644
+--- a/homeassistant/components/huawei_lte/diagnostics.py
++++ b/homeassistant/components/huawei_lte/diagnostics.py
+@@ -59,6 +59,7 @@ WLAN_MULTI_BASIC_SETTINGS_DATA_TO_REDACT = {
+     "WifiMac",
+ }
+ TO_REDACT = {
++    "dhcp_settings",
+     *ENTRY_FIELDS_DATA_TO_REDACT,
+     *DEVICE_INFORMATION_DATA_TO_REDACT,
+     *DEVICE_SIGNAL_DATA_TO_REDACT,
+diff --git a/homeassistant/components/huawei_lte/strings.json b/homeassistant/components/huawei_lte/strings.json
+index c1835a8..91472fe 100644
+--- a/homeassistant/components/huawei_lte/strings.json
++++ b/homeassistant/components/huawei_lte/strings.json
+@@ -368,6 +368,9 @@
+       }
+     },
+     "switch": {
++      "dhcp": {
++        "name": "DHCP server"
++      },
+       "mobile_data": {
+         "name": "Mobile data"
+       },
+diff --git a/homeassistant/components/huawei_lte/switch.py b/homeassistant/components/huawei_lte/switch.py
+index 49569f0..f436c2c 100644
+--- a/homeassistant/components/huawei_lte/switch.py
++++ b/homeassistant/components/huawei_lte/switch.py
+@@ -9,15 +9,31 @@ from homeassistant.components.switch import (
+     SwitchEntity,
+ )
+ from homeassistant.core import HomeAssistant
++from homeassistant.exceptions import HomeAssistantError
+ from homeassistant.helpers.entity import Entity
+ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+ 
+ from . import HuaweiLteConfigEntry
+-from .const import KEY_DIALUP_MOBILE_DATASWITCH, KEY_WLAN_WIFI_GUEST_NETWORK_SWITCH
++from .const import (
++    KEY_DHCP_SETTINGS,
++    KEY_DIALUP_MOBILE_DATASWITCH,
++    KEY_WLAN_WIFI_GUEST_NETWORK_SWITCH,
++)
+ from .entity import HuaweiLteBaseEntityWithDevice
+ 
+ _LOGGER = logging.getLogger(__name__)
+ 
++_DHCP_PRESERVED_FIELDS = (
++    "DhcpIPAddress",
++    "DhcpLanNetmask",
++    "DhcpStartIPAddress",
++    "DhcpEndIPAddress",
++    "DhcpLeaseTime",
++    "DnsStatus",
++    "PrimaryDns",
++    "SecondaryDns",
++)
++
+ 
+ async def async_setup_entry(
+     hass: HomeAssistant,
+@@ -31,6 +47,10 @@ async def async_setup_entry(
+     if router.data.get(KEY_DIALUP_MOBILE_DATASWITCH):
+         switches.append(HuaweiLteMobileDataSwitch(router))
+ 
++    dhcp = router.data.get(KEY_DHCP_SETTINGS)
++    if isinstance(dhcp, dict) and str(dhcp.get("DhcpStatus")) in ("0", "1"):
++        switches.append(HuaweiLteDhcpSwitch(router))
++
+     if router.data.get(KEY_WLAN_WIFI_GUEST_NETWORK_SWITCH, {}).get("WifiEnable"):
+         switches.append(HuaweiLteWifiGuestNetworkSwitch(router))
+ 
+@@ -84,6 +104,52 @@ class HuaweiLteBaseSwitch(HuaweiLteBaseEntityWithDevice, SwitchEntity):
+         self._raw_state = str(value)
+ 
+ 
++class HuaweiLteDhcpSwitch(HuaweiLteBaseSwitch):
++    """Control the router DHCP server."""
++
++    _attr_translation_key = "dhcp"
++    key = KEY_DHCP_SETTINGS
++    item = "DhcpStatus"
++
++    @property
++    @override
++    def _device_unique_id(self) -> str:
++        return f"{self.key}.{self.item}"
++
++    @property
++    @override
++    def is_on(self) -> bool:
++        """Return whether DHCP is enabled."""
++        return self._raw_state == "1"
++
++    @override
++    def _turn(self, state: bool) -> None:
++        settings = self.router.client.dhcp.settings()
++        if not isinstance(settings, dict) or str(settings.get("DhcpStatus")) not in (
++            "0",
++            "1",
++        ):
++            raise HomeAssistantError("Could not read the current DHCP settings")
++        requested = "1" if state else "0"
++        if str(settings["DhcpStatus"]) != requested:
++            self.router.connection.post_set(
++                "dhcp/settings", {**settings, "DhcpStatus": requested}
++            )
++        actual = self.router.client.dhcp.settings()
++        if not isinstance(actual, dict) or str(actual.get("DhcpStatus")) != requested:
++            raise HomeAssistantError("Could not verify the requested DHCP state")
++        self.router.data[self.key] = actual
++        self._raw_state = requested
++        self.schedule_update_ha_state()
++        if any(
++            key in settings and actual.get(key) != settings[key]
++            for key in _DHCP_PRESERVED_FIELDS
++        ):
++            raise HomeAssistantError(
++                "The router changed other DHCP or DNS settings unexpectedly"
++            )
++
++
+ class HuaweiLteMobileDataSwitch(HuaweiLteBaseSwitch):
+     """Huawei LTE mobile data switch device."""
+ 
+diff --git a/tests/components/huawei_lte/__init__.py b/tests/components/huawei_lte/__init__.py
+index de93908..de22486 100644
+--- a/tests/components/huawei_lte/__init__.py
++++ b/tests/components/huawei_lte/__init__.py
+@@ -313,6 +313,15 @@ def magic_client() -> MagicMock:
+ 
+     return MagicMock(
+         device=device,
++        dhcp=MagicMock(
++            settings=MagicMock(
++                return_value={
++                    "DhcpStatus": "0",
++                    "DhcpIPAddress": "192.168.1.254",
++                    "PrimaryDns": "192.168.1.1",
++                }
++            )
++        ),
+         monitoring=monitoring,
+         net=net,
+         sms=sms,
+diff --git a/tests/components/huawei_lte/snapshots/test_diagnostics.ambr b/tests/components/huawei_lte/snapshots/test_diagnostics.ambr
+index 0c2076d..bf9b5dc 100644
+--- a/tests/components/huawei_lte/snapshots/test_diagnostics.ambr
++++ b/tests/components/huawei_lte/snapshots/test_diagnostics.ambr
+@@ -75,6 +75,7 @@
+         'ulfrequency': '1969700kHz',
+         'wdlfreq': None,
+       }),
++      'dhcp_settings': '**REDACTED**',
+       'dialup_mobile_dataswitch': dict({
+         'dataswitch': '1',
+       }),
+diff --git a/tests/components/huawei_lte/test_dhcp_switch.py b/tests/components/huawei_lte/test_dhcp_switch.py
+new file mode 100644
+index 0000000..ebfb6f9
+--- /dev/null
++++ b/tests/components/huawei_lte/test_dhcp_switch.py
+@@ -0,0 +1,89 @@
++"""Tests for the Huawei LTE DHCP switch."""
++
++from unittest.mock import MagicMock
++
++import pytest
++
++from homeassistant.components.huawei_lte.switch import HuaweiLteDhcpSwitch
++from homeassistant.exceptions import HomeAssistantError
++
++SETTINGS = {
++    "DhcpStatus": "0",
++    "DhcpIPAddress": "10.0.0.1",
++    "DhcpLanNetmask": "255.255.0.0",
++    "DhcpStartIPAddress": "10.0.1.10",
++    "DhcpEndIPAddress": "10.0.2.20",
++    "DhcpLeaseTime": "86400",
++    "DnsStatus": "0",
++    "PrimaryDns": "1.1.1.1",
++    "SecondaryDns": "8.8.8.8",
++    "accessipaddress": None,
++}
++
++
++def test_enable_preserves_settings() -> None:
++    """Send the complete retrieved configuration with only DHCP status changed."""
++    router = MagicMock()
++    changed = {**SETTINGS, "DhcpStatus": "1"}
++    router.client.dhcp.settings.side_effect = [SETTINGS.copy(), changed.copy()]
++    switch = HuaweiLteDhcpSwitch(router)
++    switch.schedule_update_ha_state = MagicMock()
++
++    switch._turn(True)
++
++    router.connection.post_set.assert_called_once_with("dhcp/settings", changed)
++    assert SETTINGS["DhcpStatus"] == "0"
++    assert switch.is_on
++
++
++def test_unchanged_avoids_write() -> None:
++    """Avoid writing when DHCP already has the requested state."""
++    router = MagicMock()
++    router.client.dhcp.settings.return_value = SETTINGS.copy()
++    switch = HuaweiLteDhcpSwitch(router)
++    switch.schedule_update_ha_state = MagicMock()
++
++    switch._turn(False)
++
++    router.connection.post_set.assert_not_called()
++    assert not switch.is_on
++
++
++def test_bad_response_does_not_write() -> None:
++    """Reject a response that does not contain a valid status."""
++    router = MagicMock()
++    router.client.dhcp.settings.return_value = {"DhcpStatus": "unexpected"}
++    switch = HuaweiLteDhcpSwitch(router)
++
++    with pytest.raises(HomeAssistantError):
++        switch._turn(True)
++
++    router.connection.post_set.assert_not_called()
++
++
++def test_failed_confirmation() -> None:
++    """Do not report success when the router did not apply the requested state."""
++    router = MagicMock()
++    router.client.dhcp.settings.return_value = SETTINGS.copy()
++    switch = HuaweiLteDhcpSwitch(router)
++    switch.schedule_update_ha_state = MagicMock()
++
++    with pytest.raises(HomeAssistantError):
++        switch._turn(True)
++
++    switch.schedule_update_ha_state.assert_not_called()
++
++
++def test_changed_dns_reports_error() -> None:
++    """Report a router changing DNS during the DHCP update."""
++    router = MagicMock()
++    changed = {**SETTINGS, "DhcpStatus": "1", "PrimaryDns": "9.9.9.9"}
++    router.client.dhcp.settings.side_effect = [SETTINGS.copy(), changed]
++    switch = HuaweiLteDhcpSwitch(router)
++    switch.schedule_update_ha_state = MagicMock()
++
++    with pytest.raises(HomeAssistantError, match="other DHCP or DNS settings"):
++        switch._turn(True)
++
++    assert switch.is_on
++    switch.schedule_update_ha_state.assert_called_once()
