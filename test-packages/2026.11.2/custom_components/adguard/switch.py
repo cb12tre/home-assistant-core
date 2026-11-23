@@ -14,7 +14,6 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .const import DOMAIN
 from .coordinator import (
     AdGuardConfigEntry,
-    AdGuardHomeDhcpCoordinator,
     AdGuardHomeState,
     AdGuardHomeStateCoordinator,
 )
@@ -27,12 +26,22 @@ PARALLEL_UPDATES = 1
 class AdGuardHomeSwitchEntityDescription(SwitchEntityDescription):
     """Describes AdGuard Home switch entity."""
 
-    is_on_fn: Callable[[AdGuardHomeState], bool]
+    is_on_fn: Callable[[AdGuardHomeState], bool | None]
     turn_on_fn: Callable[[AdGuardHome], Callable[[], Coroutine[Any, Any, None]]]
     turn_off_fn: Callable[[AdGuardHome], Callable[[], Coroutine[Any, Any, None]]]
+    supported_fn: Callable[[AdGuardHomeState], bool] = lambda _: True
 
 
 SWITCHES: tuple[AdGuardHomeSwitchEntityDescription, ...] = (
+    AdGuardHomeSwitchEntityDescription(
+        key="dhcp",
+        translation_key="dhcp",
+        icon="mdi:ip-network",
+        is_on_fn=lambda data: data.dhcp_enabled,
+        turn_on_fn=lambda adguard: adguard.dhcp.enable,
+        turn_off_fn=lambda adguard: adguard.dhcp.disable,
+        supported_fn=lambda data: data.status.dhcp_available,
+    ),
     AdGuardHomeSwitchEntityDescription(
         key="protection",
         translation_key="protection",
@@ -87,55 +96,10 @@ async def async_setup_entry(
     coordinator = entry.runtime_data.state
 
     async_add_entities(
-        AdGuardHomeSwitch(coordinator, description) for description in SWITCHES
+        AdGuardHomeSwitch(coordinator, description)
+        for description in SWITCHES
+        if description.supported_fn(coordinator.data)
     )
-
-    if coordinator.data.status.dhcp_available:
-        dhcp = AdGuardHomeDhcpCoordinator(hass, entry, entry.runtime_data.client)
-        await dhcp.async_refresh()
-        async_add_entities([AdGuardDhcpSwitch(dhcp)])
-
-
-class AdGuardDhcpSwitch(AdGuardHomeEntity[AdGuardHomeDhcpCoordinator], SwitchEntity):
-    """Control the AdGuard Home DHCP server."""
-
-    _attr_translation_key = "dhcp"
-    _attr_icon = "mdi:ip-network"
-
-    def __init__(self, coordinator: AdGuardHomeDhcpCoordinator) -> None:
-        """Initialize the DHCP switch."""
-        super().__init__(coordinator)
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_dhcp"
-
-    @property
-    @override
-    def is_on(self) -> bool | None:
-        """Return whether DHCP is configured as enabled."""
-        return self.coordinator.data.enabled if self.coordinator.data else None
-
-    @override
-    async def async_turn_on(self, **kwargs: Any) -> None:
-        """Enable the DHCP server."""
-        try:
-            await self.coordinator.client.dhcp.enable()
-        except AdGuardHomeError as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="error_while_turn_on",
-            ) from err
-        await self.coordinator.async_request_refresh()
-
-    @override
-    async def async_turn_off(self, **kwargs: Any) -> None:
-        """Disable the DHCP server."""
-        try:
-            await self.coordinator.client.dhcp.disable()
-        except AdGuardHomeError as err:
-            raise HomeAssistantError(
-                translation_domain=DOMAIN,
-                translation_key="error_while_turn_off",
-            ) from err
-        await self.coordinator.async_request_refresh()
 
 
 class AdGuardHomeSwitch(AdGuardHomeEntity[AdGuardHomeStateCoordinator], SwitchEntity):
@@ -182,6 +146,12 @@ class AdGuardHomeSwitch(AdGuardHomeEntity[AdGuardHomeStateCoordinator], SwitchEn
 
     @property
     @override
-    def is_on(self) -> bool:
+    def available(self) -> bool:
+        """Return whether the switch state could be read."""
+        return super().available and self.is_on is not None
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
         """Return the state of the switch."""
         return self.entity_description.is_on_fn(self.coordinator.data)

@@ -76,7 +76,7 @@ async def test_adguard_custom_setup_and_commands(
     await hass.services.async_call(
         "switch", "turn_off", {ATTR_ENTITY_ID: entity_id}, blocking=True
     )
-    freezer.tick(timedelta(seconds=30))
+    freezer.tick(timedelta(seconds=10))
     async_fire_time_changed(hass)
     await hass.async_block_till_done(wait_background_tasks=True)
     assert hass.states.is_state(entity_id, STATE_OFF)
