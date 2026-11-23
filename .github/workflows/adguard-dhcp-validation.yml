@@ -1,4 +1,4 @@
-name: Validate AdGuard DHCP switch
+name: Validate DHCP switches
 
 on:
   push:
@@ -13,10 +13,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 35
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - branch: adguard-dhcp-status
+            tests: tests/components/adguard
+          - branch: huawei-dhcp-switch
+            tests: tests/components/huawei_lte/test_dhcp_switch.py
     steps:
       - name: Fetch proposed branch
         run: |
-          git clone --depth 1 --branch adguard-dhcp-status https://github.com/cb12tre/home-assistant-core.git source
+          git clone --depth 1 --branch "${{ matrix.branch }}" https://github.com/cb12tre/home-assistant-core.git source
       - name: Install test dependencies
         working-directory: source
         run: |
@@ -24,16 +32,16 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           uv python install 3.14.10
           uv venv
-          uv pip install -e . -e packages/pytest-homeassistant -r requirements_test.txt adguardhome==1.0.0 aiohasupervisor==0.11.0
+          uv pip install -e . -e packages/pytest-homeassistant -r requirements_test.txt adguardhome==1.0.0 aiohasupervisor==0.11.0 huawei-lte-api==1.11.0 url-normalize==3.1.0
       - name: Generate English translations
         working-directory: source
-        run: .venv/bin/python -m script.translations develop --integration adguard
-      - name: Run AdGuard tests
+        run: .venv/bin/python -m script.translations develop --all
+      - name: Run integration tests
         working-directory: source
         run: |
           set -o pipefail
-          .venv/bin/python -m pytest -q tests/components/adguard 2>&1 | tee /tmp/adguard-test.log || {
-            message=$(tail -30 /tmp/adguard-test.log | tr '\n' ' ' | sed 's/%/%25/g')
+          .venv/bin/python -m pytest -q --timeout=30 "${{ matrix.tests }}" 2>&1 | tee /tmp/dhcp-test.log || {
+            message=$(tail -30 /tmp/dhcp-test.log | tr '\n' ' ' | sed 's/%/%25/g')
             echo "::error::Pytest failed: $message"
             exit 1
           }
