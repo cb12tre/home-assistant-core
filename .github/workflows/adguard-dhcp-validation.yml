@@ -30,4 +30,10 @@ jobs:
         run: .venv/bin/python -m script.translations develop --integration adguard
       - name: Run AdGuard tests
         working-directory: source
-        run: .venv/bin/python -m pytest -q tests/components/adguard
+        run: |
+          set -o pipefail
+          .venv/bin/python -m pytest -q tests/components/adguard 2>&1 | tee /tmp/adguard-test.log || {
+            message=$(tail -30 /tmp/adguard-test.log | tr '\n' ' ' | sed 's/%/%25/g')
+            echo "::error::Pytest failed: $message"
+            exit 1
+          }
