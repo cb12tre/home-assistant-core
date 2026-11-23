@@ -12,6 +12,7 @@ from adguardhome import (
     AdGuardHomeConnectionError,
     AdGuardHomeError,
     AvailableUpdate,
+    DhcpConfig,
     FilteringConfig,
     FilterList,
     QueryLogConfig,
@@ -159,6 +160,21 @@ class AdGuardHomeStatisticsCoordinator(AdGuardHomeCoordinator[AdGuardHomeStatist
         )
 
         return AdGuardHomeStatistics(stats=stats, blocklists=blocklists)
+
+
+class AdGuardHomeDhcpCoordinator(AdGuardHomeCoordinator[DhcpConfig]):
+    """Keep track of the DHCP server configuration independently."""
+
+    def __init__(
+        self, hass: HomeAssistant, entry: AdGuardConfigEntry, client: AdGuardHome
+    ) -> None:
+        """Initialize the coordinator."""
+        super().__init__(hass, entry, client, "dhcp", timedelta(seconds=30))
+
+    @override
+    async def _async_fetch(self) -> DhcpConfig:
+        """Fetch the DHCP server configuration."""
+        return await self.client.dhcp.config()
 
 
 class AdGuardHomeUpdateCoordinator(AdGuardHomeCoordinator[AvailableUpdate]):

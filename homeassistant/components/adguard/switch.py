@@ -14,6 +14,7 @@ from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from .const import DOMAIN
 from .coordinator import (
     AdGuardConfigEntry,
+    AdGuardHomeDhcpCoordinator,
     AdGuardHomeState,
     AdGuardHomeStateCoordinator,
 )
@@ -88,6 +89,53 @@ async def async_setup_entry(
     async_add_entities(
         AdGuardHomeSwitch(coordinator, description) for description in SWITCHES
     )
+
+    if coordinator.data.status.dhcp_available:
+        dhcp = AdGuardHomeDhcpCoordinator(hass, entry, entry.runtime_data.client)
+        await dhcp.async_refresh()
+        async_add_entities([AdGuardDhcpSwitch(dhcp)])
+
+
+class AdGuardDhcpSwitch(AdGuardHomeEntity[AdGuardHomeDhcpCoordinator], SwitchEntity):
+    """Control the AdGuard Home DHCP server."""
+
+    _attr_translation_key = "dhcp"
+    _attr_icon = "mdi:ip-network"
+
+    def __init__(self, coordinator: AdGuardHomeDhcpCoordinator) -> None:
+        """Initialize the DHCP switch."""
+        super().__init__(coordinator)
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_dhcp"
+
+    @property
+    @override
+    def is_on(self) -> bool | None:
+        """Return whether DHCP is configured as enabled."""
+        return self.coordinator.data.enabled if self.coordinator.data else None
+
+    @override
+    async def async_turn_on(self, **kwargs: Any) -> None:
+        """Enable the DHCP server."""
+        try:
+            await self.coordinator.client.dhcp.enable()
+        except AdGuardHomeError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="error_while_turn_on",
+            ) from err
+        await self.coordinator.async_request_refresh()
+
+    @override
+    async def async_turn_off(self, **kwargs: Any) -> None:
+        """Disable the DHCP server."""
+        try:
+            await self.coordinator.client.dhcp.disable()
+        except AdGuardHomeError as err:
+            raise HomeAssistantError(
+                translation_domain=DOMAIN,
+                translation_key="error_while_turn_off",
+            ) from err
+        await self.coordinator.async_request_refresh()
 
 
 class AdGuardHomeSwitch(AdGuardHomeEntity[AdGuardHomeStateCoordinator], SwitchEntity):
