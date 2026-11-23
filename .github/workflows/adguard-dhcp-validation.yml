@@ -1,0 +1,33 @@
+name: Validate AdGuard DHCP switch
+
+on:
+  push:
+    branches:
+      - ci/adguard-dhcp-test
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - name: Fetch proposed branch
+        run: |
+          git clone --depth 1 --branch adguard-dhcp-status https://github.com/cb12tre/home-assistant-core.git source
+      - name: Install test dependencies
+        working-directory: source
+        run: |
+          python3 -m pip install --user uv
+          export PATH="$HOME/.local/bin:$PATH"
+          uv python install 3.14.10
+          uv venv
+          uv pip install -e . -e packages/pytest-homeassistant -r requirements_test.txt adguardhome==1.0.0
+      - name: Generate English translations
+        working-directory: source
+        run: .venv/bin/python -m script.translations develop --integration adguard
+      - name: Run AdGuard tests
+        working-directory: source
+        run: .venv/bin/python -m pytest -q tests/components/adguard
