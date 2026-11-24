@@ -17,7 +17,7 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - branch: adguard-dhcp-status
+          - branch: adguard-dhcp-pr
             tests: tests/components/adguard
             repository: cb12tre/home-assistant-core
             release_patch: false
