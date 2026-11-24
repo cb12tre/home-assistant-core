@@ -36,7 +36,6 @@ SWITCHES: tuple[AdGuardHomeSwitchEntityDescription, ...] = (
     AdGuardHomeSwitchEntityDescription(
         key="dhcp",
         translation_key="dhcp",
-        icon="mdi:ip-network",
         is_on_fn=lambda data: data.dhcp_enabled,
         turn_on_fn=lambda adguard: adguard.dhcp.enable,
         turn_off_fn=lambda adguard: adguard.dhcp.disable,
