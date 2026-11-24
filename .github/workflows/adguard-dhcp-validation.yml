@@ -25,6 +25,7 @@ jobs:
             tests: tests/components/huawei_lte
             repository: cb12tre/home-assistant-core
             release_patch: false
+            api: "huawei-lte-api @ git+https://github.com/Salamek/huawei-lte-api@830b1cc99dd9bf21920f0284176adb70c1e72e63"
           - branch: 2026.11.2
             tests: tests/components/huawei_lte
             repository: home-assistant/core
@@ -52,7 +53,7 @@ jobs:
           export PATH="$HOME/.local/bin:$PATH"
           uv python install 3.14.10
           uv venv
-          uv pip install -e . -e packages/pytest-homeassistant -r requirements_test.txt adguardhome==1.0.0 aiohasupervisor==0.11.0 huawei-lte-api==1.11.0 url-normalize==3.1.0
+          uv pip install -e . -e packages/pytest-homeassistant -r requirements_test.txt adguardhome==1.0.0 aiohasupervisor==0.11.0 url-normalize==3.1.0 "${{ matrix.api || 'huawei-lte-api==1.11.0' }}"
       - name: Generate English translations
         working-directory: source
         run: .venv/bin/python -m script.translations develop --all
