@@ -26,6 +26,11 @@ jobs:
             repository: cb12tre/home-assistant-core
             release_patch: false
             api: huawei-lte-api==3.0.0
+          - branch: bump-huawei-lte-api-3.0.0
+            tests: tests/components/huawei_lte
+            repository: cb12tre/home-assistant-core
+            release_patch: false
+            api: huawei-lte-api==3.0.0
           - branch: 2026.11.2
             tests: tests/components/huawei_lte
             repository: home-assistant/core
